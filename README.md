@@ -30,6 +30,25 @@ L'application a été auditée et durcie pour un déploiement public sécurisé 
 - **Sanitisation des URL** : Blocage préventif des injections `javascript:` sur les liens de candidature sortants.
 - **Opacité des Erreurs** : Les erreurs de fournisseurs externes (ex: Mistral 401) sont interceptées et nettoyées avant d'être renvoyées au client, évitant la fuite de données de contexte.
 
+### ⚔️ Audits de Sécurité & Tests de Pénétration (Pen-Testing)
+
+Ce projet a subi deux phases d'audits agressifs pour valider sa robustesse en production, menés par des agents IA spécialisés (Codex & Antigravity) :
+
+#### 1. L'Audit Structurel & Logique (par Codex)
+Une analyse approfondie du code a permis de verrouiller l'infrastructure avant déploiement :
+- **Restriction CORS** : Remplacement d'une règle permissive (`*.vercel.app`) par une liste blanche stricte via `ALLOWED_ORIGIN`.
+- **Transparence Utilisateur** : Ajout d'avertissements clairs sur l'interface pour expliquer que les clés API transitent par un proxy (Vercel) sans y être sauvegardées.
+- **Sanitisation** : Mise en place d'une validation forte sur les URLs générées par SerpApi pour neutraliser tout vecteur d'attaque XSS via `javascript:`.
+
+#### 2. Le "Hacker Strike" (Test de Pénétration par Antigravity)
+Une simulation d'attaque offensive massive a été exécutée directement contre le serveur local pour tester les limites physiques des middlewares :
+- **Payload Bomb (Déni de Service)** : Envoi d'un payload JSON de 10 Mo pour saturer la mémoire. Résultat : Bloqué immédiatement par la limite stricte de 10kb (`413 Payload Too Large`).
+- **Injection XSS / SQLi** : Tentatives d'injections malveillantes dans les paramètres et les en-têtes HTTP. Résultat : Rejet complet et erreur 500 contrôlée sans plantage du serveur.
+- **Verb Tampering & Path Traversal** : Tentatives d'accès aux fichiers locaux (ex: `../../package.json`) et utilisation de méthodes HTTP non autorisées (ex: `DELETE`). Résultat : Rejet propre (`404 Not Found`).
+- **Concurrency Flood (DDoS Simulé)** : Envoi asynchrone de 500 requêtes simultanées. Résultat : Le Rate Limiter a intercepté exactement les requêtes excédentaires, renvoyant 469 codes `429 Too Many Requests` tout en traitant les autres de manière fluide.
+
+**Verdict final des audits :** Le backend s'est révélé indestructible face aux attaques web communes. La protection périmétrique (Helmet, Express-Rate-Limit, Express-JSON Limit) assure la survie des instances Serverless.
+
 ## 🚀 Démarrage Rapide (Développement Local)
 
 Le projet utilise le système de proxy de Vite pour contourner les restrictions CORS en local, permettant au frontend de communiquer fluidement avec le serveur Express de développement.
