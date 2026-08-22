@@ -19,6 +19,14 @@ function SettingsForm({ onSave, onCancel }) {
     }, 1000)
   }
 
+  const handleDeleteKeys = () => {
+    localStorage.removeItem('mistralKey')
+    localStorage.removeItem('serpapiKey')
+    setMistralKey("")
+    setSerpapiKey("")
+    setIsSaved(false)
+  }
+
   return (
     <div className="job-list" style={{ marginTop: '2rem', maxWidth: '600px', marginLeft: 'auto', marginRight: 'auto' }}>
       <h2 style={{ marginBottom: '1rem', color: 'var(--text-main)' }}>Paramètres du Profil</h2>
@@ -61,6 +69,9 @@ function SettingsForm({ onSave, onCancel }) {
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+          <button type="button" onClick={handleDeleteKeys} className="btn-secondary" style={{ flex: 1 }}>
+            Supprimer mes clés
+          </button>
           <button type="button" onClick={onCancel} className="btn-update" style={{ background: 'transparent', border: '1px solid var(--card-border)', flex: 1 }}>
             Annuler
           </button>

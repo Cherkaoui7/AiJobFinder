@@ -27,7 +27,10 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      const error = new Error('Origin not allowed');
+      error.status = 403;
+      error.code = 'CORS_ORIGIN_DENIED';
+      callback(error);
     }
   }
 }));
@@ -176,6 +179,23 @@ Réponds UNIQUEMENT avec un objet JSON avec deux clés :
     console.error("Erreur serveur (/api/ai/evaluate):", error.message);
     res.status(500).json({ error: "Erreur interne du serveur" });
   }
+});
+
+// Keep all errors JSON-only so implementation details and stack traces never
+// reach clients, including errors raised before a route handler runs.
+app.use((error, req, res, _next) => {
+  const status = error.status || error.statusCode || 500;
+
+  if (status === 413 || error.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Requête trop volumineuse.' });
+  }
+
+  if (error.code === 'CORS_ORIGIN_DENIED' || status === 403) {
+    return res.status(403).json({ error: 'Origine non autorisée.' });
+  }
+
+  console.error('Erreur API non gérée:', error.message);
+  return res.status(500).json({ error: 'Erreur interne du serveur.' });
 });
 
 // Exportation de l'application Express pour Vercel (PAS de app.listen ici !)

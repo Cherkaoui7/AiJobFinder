@@ -29,6 +29,7 @@ function App() {
       setStatusMessage(`Analyse de ${realJobs.length} offres par Mistral AI...`)
 
       // 2. Pour chaque vraie offre trouvée, on demande à Mistral d'évaluer le match
+      let failedEvaluations = 0
       const evaluatedJobs = await Promise.all(
         realJobs.map(async (job) => {
           const aiResult = await evaluateJob(job, userProfile);
@@ -41,6 +42,7 @@ function App() {
             }
           }
           // En cas d'erreur de l'IA, on retourne l'offre avec un score par défaut
+          failedEvaluations += 1
           return { ...job, matchScore: 0, aiSummary: "Analyse IA non disponible." }; 
         })
       )
@@ -48,6 +50,11 @@ function App() {
       // On trie par score décroissant
       evaluatedJobs.sort((a, b) => b.matchScore - a.matchScore)
       setJobs(evaluatedJobs)
+      setStatusMessage(
+        failedEvaluations > 0
+          ? `${failedEvaluations} analyse(s) IA indisponible(s). Vérifiez votre clé Mistral ou réessayez plus tard.`
+          : ""
+      )
       
     } catch (error) {
       console.error("Erreur globale lors de l'évaluation :", error)
@@ -95,7 +102,7 @@ function App() {
             Vos offres sélectionnées par l'IA
           </h2>
           
-          {isLoading && <p style={{ color: 'var(--accent-primary)', marginBottom: '1rem' }}>{statusMessage}</p>}
+          {statusMessage && <p style={{ color: isLoading ? 'var(--accent-primary)' : 'var(--text-muted)', marginBottom: '1rem' }}>{statusMessage}</p>}
           
           {!isLoading && jobs.length === 0 && (
             <p style={{ color: 'var(--text-muted)' }}>

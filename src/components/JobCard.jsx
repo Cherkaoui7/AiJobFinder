@@ -1,5 +1,14 @@
 import './JobCard.css'
 
+function isSafeApplicationUrl(value) {
+  try {
+    const { protocol } = new URL(value)
+    return protocol === 'https:' || protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
 function JobCard({ job }) {
   return (
     <div className="job-card">
@@ -30,7 +39,7 @@ function JobCard({ job }) {
       </div>
 
       <div className="job-card-actions">
-        {job.url && job.url.startsWith("http") ? (
+        {isSafeApplicationUrl(job.url) ? (
           <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn-primary" style={{ display: 'inline-block', textAlign: 'center', textDecoration: 'none' }}>
             Apply Now
           </a>
