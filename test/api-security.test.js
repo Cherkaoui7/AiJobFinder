@@ -47,6 +47,17 @@ test('rejects oversized JSON bodies without a stack trace', async () => {
   assert.deepEqual(await response.json(), { error: 'Requête trop volumineuse.' });
 });
 
+test('rejects malformed JSON as a client error without a stack trace', async () => {
+  const response = await fetch(`${baseUrl}/api/ai/evaluate`, {
+    method: 'POST',
+    headers: { Origin: 'http://localhost:5173', 'Content-Type': 'application/json' },
+    body: '{"job":',
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: 'JSON de requête invalide.' });
+});
+
 test('rate limits repeated unauthenticated requests', async () => {
   const responses = await Promise.all(
     Array.from({ length: 31 }, () => fetch(`${baseUrl}/api/ai/evaluate`, {

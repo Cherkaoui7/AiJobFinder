@@ -186,6 +186,10 @@ Réponds UNIQUEMENT avec un objet JSON avec deux clés :
 app.use((error, req, res, _next) => {
   const status = error.status || error.statusCode || 500;
 
+  if (error instanceof SyntaxError && 'body' in error) {
+    return res.status(400).json({ error: 'JSON de requête invalide.' });
+  }
+
   if (status === 413 || error.type === 'entity.too.large') {
     return res.status(413).json({ error: 'Requête trop volumineuse.' });
   }
