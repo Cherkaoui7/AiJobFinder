@@ -20,7 +20,7 @@ app.use(helmet());
 // ---------------------------------------------------------------------------
 app.use(cors()); // Accepte toutes les origines
 
-app.use(express.json({ limit: '10kb' })); // Limite la taille des requêtes JSON à 10ko
+app.use(express.json({ limit: '5mb' })); // Augmenté à 5mb pour les longues descriptions de poste
 
 // ---------------------------------------------------------------------------
 // Limite de requêtes (Rate Limiting)
@@ -173,7 +173,10 @@ Réponds UNIQUEMENT avec un objet JSON avec deux clés :
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[DEBUG IA] Erreur brute API (${response.status}):`, errorText);
-      throw new Error(`Erreur API IA: ${response.status}`);
+      return res.status(response.status).json({ 
+        error: `Erreur API IA (${response.status})`, 
+        details: errorText 
+      });
     }
 
     const data = await response.json();
@@ -202,9 +205,9 @@ Réponds UNIQUEMENT avec un objet JSON avec deux clés :
   } catch (error) {
     console.error(`\n========== [ERREUR CRITIQUE SERVEUR] ==========`);
     console.error("Erreur serveur (/api/ai/evaluate):", error.message);
-    console.error("Stack trace complet :", error.stack);
-    console.error(`===============================================\n`);
-    res.status(500).json({ error: "Erreur interne du serveur" });
+    
+    // Renvoyer le vrai message d'erreur pour faciliter le débuggage en ligne
+    res.status(500).json({ error: error.message });
   }
 });
 
