@@ -59,17 +59,28 @@ app.get('/api/jobs', async (req, res) => {
     console.log(`[DEBUG SerpApi] Requête reçue. Query: "${query}"`);
     console.log(`[DEBUG SerpApi] Clé fournie (obfusquée) : ${SERPAPI_KEY.substring(0, 4)}...${SERPAPI_KEY.substring(SERPAPI_KEY.length - 4)}`);
     
-    const url = `https://serpapi.com/search.json?engine=google_jobs&q=${encodeURIComponent(query)}&api_key=${SERPAPI_KEY}`;
+    let jobs = [];
+    let start = 0;
     
-    const response = await fetch(url);
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[DEBUG SerpApi] Erreur brute depuis SerpApi (${response.status}):`, errorText);
-      throw new Error(`Erreur SerpApi: ${response.status}`);
-    }
+    // Boucle pour récupérer exactement 10 offres (ou s'arrêter s'il n'y en a plus)
+    while (jobs.length < 10) {
+      const url = `https://serpapi.com/search.json?engine=google_jobs&q=${encodeURIComponent(query)}&start=${start}&api_key=${SERPAPI_KEY}`;
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[DEBUG SerpApi] Erreur brute depuis SerpApi (${response.status}):`, errorText);
+        throw new Error(`Erreur SerpApi: ${response.status}`);
+      }
 
-    const data = await response.json();
-    const jobs = data.jobs_results || [];
+      const data = await response.json();
+      const pageJobs = data.jobs_results || [];
+      
+      if (pageJobs.length === 0) break; // Plus aucune offre disponible
+      
+      jobs = jobs.concat(pageJobs);
+      start += 10; // Page suivante
+    }
 
     // Formatage côté serveur pour alléger le frontend
     const formattedJobs = jobs.slice(0, 10).map((job, index) => {
