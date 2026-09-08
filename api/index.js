@@ -15,25 +15,10 @@ const app = express();
 app.use(helmet());
 
 // ---------------------------------------------------------------------------
-// Configuration CORS stricte
-// N'autoriser que les requêtes venant du domaine frontend
+// Configuration CORS
+// Le backend ne stocke aucune clé (BYOK), il agit comme un proxy ouvert.
 // ---------------------------------------------------------------------------
-const allowedOrigins = process.env.ALLOWED_ORIGIN 
-  ? process.env.ALLOWED_ORIGIN.split(',') 
-  : ['http://localhost:5173', 'http://localhost:3000'];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      const error = new Error('Origin not allowed');
-      error.status = 403;
-      error.code = 'CORS_ORIGIN_DENIED';
-      callback(error);
-    }
-  }
-}));
+app.use(cors()); // Accepte toutes les origines
 
 app.use(express.json({ limit: '10kb' })); // Limite la taille des requêtes JSON à 10ko
 
