@@ -51,7 +51,6 @@ const apiLimiter = rateLimit({
 
 app.use('/api/', apiLimiter);
 
-const AI_BASE_URL = process.env.AI_BASE_URL || 'https://api.mistral.ai/v1';
 
 // ---------------------------------------------------------------------------
 // Route 1 : Récupération des offres d'emploi via SerpApi (Google Jobs)
@@ -72,10 +71,15 @@ app.get('/api/jobs', async (req, res) => {
 
     const query = `${title || ''} ${location || ''}`.trim() || 'développeur';
     
+    console.log(`[DEBUG SerpApi] Requête reçue. Query: "${query}"`);
+    console.log(`[DEBUG SerpApi] Clé fournie (obfusquée) : ${SERPAPI_KEY.substring(0, 4)}...${SERPAPI_KEY.substring(SERPAPI_KEY.length - 4)}`);
+    
     const url = `https://serpapi.com/search.json?engine=google_jobs&q=${encodeURIComponent(query)}&api_key=${SERPAPI_KEY}`;
     
     const response = await fetch(url);
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[DEBUG SerpApi] Erreur brute depuis SerpApi (${response.status}):`, errorText);
       throw new Error(`Erreur SerpApi: ${response.status}`);
     }
 
@@ -116,9 +120,12 @@ app.post('/api/ai/evaluate', async (req, res) => {
   try {
     let AI_API_KEY = req.headers['x-ai-key'];
     if (!AI_API_KEY) {
-      return res.status(401).json({ error: "Clé API Mistral manquante dans les en-têtes." });
+      return res.status(401).json({ error: "Clé API IA manquante dans les en-têtes." });
     }
     AI_API_KEY = AI_API_KEY.trim();
+
+    const aiBaseUrl = req.headers['x-ai-base-url'] || process.env.AI_BASE_URL || 'https://api.mistral.ai/v1';
+    const aiModel = req.headers['x-ai-model'] || 'mistral-small-latest';
 
     const { job, userProfile } = req.body;
 
@@ -133,6 +140,11 @@ app.post('/api/ai/evaluate', async (req, res) => {
     ) {
       return res.status(400).json({ error: "Payload trop volumineux." });
     }
+
+    console.log(`\n========== [DEBUG IA - NOUVELLE REQUÊTE] ==========`);
+    console.log(`[DEBUG IA] Modèle utilisé : ${aiModel} sur ${aiBaseUrl}`);
+    console.log(`[DEBUG IA] Requête d'évaluation reçue pour le poste : "${job.title}"`);
+    console.log(`[DEBUG IA] Clé fournie (obfusquée) : ${AI_API_KEY.substring(0, 4)}...${AI_API_KEY.substring(AI_API_KEY.length - 4)}`);
 
     const prompt = `
 Tu es un recruteur expert. 
@@ -152,31 +164,61 @@ Réponds UNIQUEMENT avec un objet JSON avec deux clés :
 - "aiSummary": 2 phrases expliquant pourquoi.
 `;
 
-    const response = await fetch(`${AI_BASE_URL}/chat/completions`, {
+    // Certains modèles ne supportent pas response_format strict, 
+    // on l'envoie mais on doit aussi gérer si le modèle répond avec des backticks markdown.
+    const requestBody = {
+      model: aiModel, 
+      messages: [{ role: "user", content: prompt }],
+    };
+    
+    // Si ce n'est pas OpenRouter (ou si on sait que c'est supporté), on peut ajouter le format
+    // Pour simplifier, on s'appuie sur le prompt très strict.
+    
+    const response = await fetch(`${aiBaseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${AI_API_KEY}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.ALLOWED_ORIGIN || 'http://localhost:5173', // Requis par OpenRouter
+        'X-Title': 'JobFinder AI', // Requis par OpenRouter
       },
-      body: JSON.stringify({
-        model: 'mistral-small-latest', 
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: 'json_object' } 
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      console.error(`Erreur Mistral API (${response.status}): La requête a échoué.`);
-      throw new Error(`Erreur Mistral: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[DEBUG IA] Erreur brute API (${response.status}):`, errorText);
+      throw new Error(`Erreur API IA: ${response.status}`);
     }
 
     const data = await response.json();
-    const contentText = data.choices[0].message.content;
+    let contentText = data.choices[0].message.content;
+    
+    console.log(`[DEBUG IA] Réponse brute du modèle : \n`, contentText);
+
+    // Amélioration de l'extraction JSON : on cherche le premier { et le dernier }
+    // Cela permet de survivre même si le modèle dit "Voici le json: { ... }"
+    const firstBrace = contentText.indexOf('{');
+    const lastBrace = contentText.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      contentText = contentText.substring(firstBrace, lastBrace + 1);
+    } else {
+      console.warn(`[DEBUG IA] Attention : Impossible de trouver des accolades dans la réponse !`);
+    }
+    
+    console.log(`[DEBUG IA] Texte après nettoyage prêt pour JSON.parse : \n`, contentText);
+    
     const parsedData = JSON.parse(contentText);
+    console.log(`[DEBUG IA] JSON correctement parsé !`);
+    console.log(`=====================================================\n`);
     
     res.json(parsedData);
   } catch (error) {
+    console.error(`\n========== [ERREUR CRITIQUE SERVEUR] ==========`);
     console.error("Erreur serveur (/api/ai/evaluate):", error.message);
+    console.error("Stack trace complet :", error.stack);
+    console.error(`===============================================\n`);
     res.status(500).json({ error: "Erreur interne du serveur" });
   }
 });

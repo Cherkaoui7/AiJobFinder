@@ -26,33 +26,37 @@ function App() {
         return;
       }
 
-      setStatusMessage(`Analyse de ${realJobs.length} offres par Mistral AI...`)
+      const currentModel = localStorage.getItem('aiModel') || "Mistral AI";
+      setStatusMessage(`Analyse de ${realJobs.length} offres par ${currentModel}...`)
 
       // 2. Pour chaque vraie offre trouvée, on demande à Mistral d'évaluer le match
       let failedEvaluations = 0
-      const evaluatedJobs = await Promise.all(
-        realJobs.map(async (job) => {
-          const aiResult = await evaluateJob(job, userProfile);
-          
-          if (aiResult) {
-            return {
-              ...job,
-              matchScore: aiResult.matchScore,
-              aiSummary: aiResult.aiSummary
-            }
-          }
-          // En cas d'erreur de l'IA, on retourne l'offre avec un score par défaut
-          failedEvaluations += 1
-          return { ...job, matchScore: 0, aiSummary: "Analyse IA non disponible." }; 
-        })
-      )
+      const evaluatedJobs = []
+
+      for (const job of realJobs) {
+        const aiResult = await evaluateJob(job, userProfile);
+        
+        if (aiResult) {
+          evaluatedJobs.push({
+            ...job,
+            matchScore: aiResult.matchScore,
+            aiSummary: aiResult.aiSummary
+          });
+        } else {
+          failedEvaluations += 1;
+          evaluatedJobs.push({ ...job, matchScore: 0, aiSummary: "Analyse IA non disponible." });
+        }
+
+        // Pause de 1 seconde entre chaque appel pour éviter le Rate Limit (Erreur 429) de Mistral
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
       
       // On trie par score décroissant
       evaluatedJobs.sort((a, b) => b.matchScore - a.matchScore)
       setJobs(evaluatedJobs)
       setStatusMessage(
         failedEvaluations > 0
-          ? `${failedEvaluations} analyse(s) IA indisponible(s). Vérifiez votre clé Mistral ou réessayez plus tard.`
+          ? `${failedEvaluations} analyse(s) IA indisponible(s). Vérifiez votre clé pour ${currentModel} ou réessayez plus tard.`
           : ""
       )
       

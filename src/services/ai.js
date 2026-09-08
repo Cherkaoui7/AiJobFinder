@@ -7,8 +7,11 @@
 export async function evaluateJob(job, userProfile) {
   try {
     const aiKey = localStorage.getItem('mistralKey');
+    const aiBaseUrl = localStorage.getItem('aiBaseUrl') || "https://api.mistral.ai/v1";
+    const aiModel = localStorage.getItem('aiModel') || "mistral-small-latest";
+    
     if (!aiKey) {
-      throw new Error("Clé API Mistral manquante.");
+      throw new Error("Clé API manquante.");
     }
 
     console.log(`[DEBUG] Demande d'évaluation au backend pour "${job.title}"...`);
@@ -17,7 +20,9 @@ export async function evaluateJob(job, userProfile) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-ai-key': aiKey
+        'x-ai-key': aiKey,
+        'x-ai-base-url': aiBaseUrl,
+        'x-ai-model': aiModel
       },
       body: JSON.stringify({ job, userProfile }),
     });
